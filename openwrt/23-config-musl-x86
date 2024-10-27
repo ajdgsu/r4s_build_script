@@ -68,4 +68,5 @@ CONFIG_PACKAGE_libffi=y
 CONFIG_PACKAGE_virtio-console-helper=y
 CONFIG_PACKAGE_libpcre=y
 NGINX_HTTP_BROTLI=y
+CONFIG_PACKAGE_qemu-ga=y
 
