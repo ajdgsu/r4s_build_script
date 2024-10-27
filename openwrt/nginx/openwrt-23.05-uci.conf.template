@@ -27,6 +27,7 @@ http {
 	large_client_header_buffers 4 32k;
 
 	gzip on;
+        gzip_comp_level 3;
 	gzip_vary on;
 	gzip_proxied any;
 	brotli on;
