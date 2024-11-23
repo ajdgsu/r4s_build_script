@@ -30,14 +30,14 @@ ip_info=`curl -sk https://ip.cooluc.com`;
 
 # script url
 if [ "$isCN" = "CN" ]; then
-    export mirror=init.cooluc.com
+    export mirror=https://init.cooluc.com
 else
-    export mirror=init2.cooluc.com
+    export mirror=https://init2.cooluc.com
 fi
 
-# github actions - automatically retrieve `github raw` links
-if [ "$(whoami)" = "runner" ] && [ -n "$GITHUB_REPO" ]; then
-    export mirror=raw.githubusercontent.com/$GITHUB_REPO/master
+# github actions - caddy server
+if [ "$(whoami)" = "runner" ] && [ -z "$git_password" ]; then
+    export mirror=http://127.0.0.1:8080
 fi
 
 # private gitea
@@ -91,7 +91,7 @@ if [ "$1" = "dev" ]; then
     export branch=openwrt-24.10
     export version=dev
 elif [ "$1" = "rc2" ]; then
-    latest_release="v$(curl -s https://$mirror/tags/v24)"
+    latest_release="v$(curl -s $mirror/tags/v24)"
     export branch=$latest_release
     export version=rc2
 fi
@@ -143,7 +143,7 @@ else
     echo -e "${GREEN_COLOR}Model: nanopi-r4s${RES}"
     [ "$1" = "rc2" ] && model="nanopi-r4s"
 fi
-get_kernel_version=$(curl -s https://$mirror/tags/kernel-6.12)
+get_kernel_version=$(curl -s $mirror/tags/kernel-6.12)
 kmod_hash=$(echo -e "$get_kernel_version" | awk -F'HASH-' '{print $2}' | awk '{print $1}' | tail -1 | md5sum | awk '{print $1}')
 kmodpkg_name=$(echo $(echo -e "$get_kernel_version" | awk -F'HASH-' '{print $2}' | awk '{print $1}')~$(echo $kmod_hash)-r1)
 echo -e "${GREEN_COLOR}Kernel: $kmodpkg_name ${RES}"
@@ -160,7 +160,7 @@ echo -e "${GREEN_COLOR}GCC VERSION: $gcc_version${RES}"
 [ "$ENABLE_LRNG" = "y" ] && echo -e "${GREEN_COLOR}ENABLE_LRNG: true${RES}" || echo -e "${GREEN_COLOR}ENABLE_LRNG:${RES} ${RED_COLOR}false${RES}"
 [ "$ENABLE_LOCAL_KMOD" = "y" ] && echo -e "${GREEN_COLOR}ENABLE_LOCAL_KMOD: true${RES}" || echo -e "${GREEN_COLOR}ENABLE_LOCAL_KMOD: false${RES}"
 [ "$BUILD_FAST" = "y" ] && echo -e "${GREEN_COLOR}BUILD_FAST: true${RES}" || echo -e "${GREEN_COLOR}BUILD_FAST:${RES} ${YELLOW_COLOR}false${RES}"
-[ "$ENABLE_CCACHE" = "y" ] && echo -e "${GREEN_COLOR}ENABLE_CCACHE: true${RES}" || echo -e "${YELLOW_COLOR}ENABLE_CCACHE:${RES} ${YELLOW_COLOR}false${RES}"
+[ "$ENABLE_CCACHE" = "y" ] && echo -e "${GREEN_COLOR}ENABLE_CCACHE: true${RES}" || echo -e "${GREEN_COLOR}ENABLE_CCACHE:${RES} ${YELLOW_COLOR}false${RES}"
 [ "$MINIMAL_BUILD" = "y" ] && echo -e "${GREEN_COLOR}MINIMAL_BUILD: true${RES}" || echo -e "${GREEN_COLOR}MINIMAL_BUILD: false${RES}"
 [ "$KERNEL_CLANG_LTO" = "y" ] && echo -e "${GREEN_COLOR}KERNEL_CLANG_LTO: true${RES}\r\n" || echo -e "${GREEN_COLOR}KERNEL_CLANG_LTO:${RES} ${YELLOW_COLOR}false${RES}\r\n"
 
@@ -178,7 +178,7 @@ git clone https://$github/immortalwrt/packages master/immortalwrt_packages --dep
 if [ -d openwrt ]; then
     cd openwrt
     echo "1730409337" > version.date # OpenWrt v24.10: set branch defaults
-    curl -Os https://$mirror/openwrt/patch/key.tar.gz && tar zxf key.tar.gz && rm -f key.tar.gz
+    curl -Os $mirror/openwrt/patch/key.tar.gz && tar zxf key.tar.gz && rm -f key.tar.gz
 else
     echo -e "${RED_COLOR}Failed to download source code${RES}"
     exit 1
@@ -228,17 +228,17 @@ fi
 echo -e "\n${GREEN_COLOR}Patching ...${RES}\n"
 
 # scripts
-curl -sO https://$mirror/openwrt/scripts/00-prepare_base.sh
-curl -sO https://$mirror/openwrt/scripts/01-prepare_base-mainline.sh
-curl -sO https://$mirror/openwrt/scripts/02-prepare_package.sh
-curl -sO https://$mirror/openwrt/scripts/03-convert_translation.sh
-curl -sO https://$mirror/openwrt/scripts/04-fix_kmod.sh
-curl -sO https://$mirror/openwrt/scripts/05-fix-source.sh
-curl -sO https://$mirror/openwrt/scripts/99_clean_build_cache.sh
+curl -sO $mirror/openwrt/scripts/00-prepare_base.sh
+curl -sO $mirror/openwrt/scripts/01-prepare_base-mainline.sh
+curl -sO $mirror/openwrt/scripts/02-prepare_package.sh
+curl -sO $mirror/openwrt/scripts/03-convert_translation.sh
+curl -sO $mirror/openwrt/scripts/04-fix_kmod.sh
+curl -sO $mirror/openwrt/scripts/05-fix-source.sh
+curl -sO $mirror/openwrt/scripts/99_clean_build_cache.sh
 if [ -n "$git_password" ] && [ -n "$private_url" ]; then
     curl -u openwrt:$git_password -sO "$private_url"
 else
-    curl -sO https://$mirror/openwrt/scripts/10-custom.sh
+    curl -sO $mirror/openwrt/scripts/10-custom.sh
 fi
 chmod 0755 *sh
 [ "$(whoami)" = "runner" ] && group "patching openwrt"
@@ -256,47 +256,44 @@ rm -rf ../master
 
 # Load devices Config
 if [ "$platform" = "x86_64" ]; then
-    curl -s https://$mirror/openwrt/24-config-musl-x86 > .config
+    curl -s $mirror/openwrt/24-config-musl-x86 > .config
 elif [ "$platform" = "bcm53xx" ]; then
     if [ "$MINIMAL_BUILD" = "y" ]; then
-        curl -s https://$mirror/openwrt/24-config-musl-r8500-minimal > .config
+        curl -s $mirror/openwrt/24-config-musl-r8500-minimal > .config
     else
-        curl -s https://$mirror/openwrt/24-config-musl-r8500 > .config
+        curl -s $mirror/openwrt/24-config-musl-r8500 > .config
     fi
     sed -i '1i\# CONFIG_PACKAGE_kselftests-bpf is not set\n# CONFIG_PACKAGE_perf is not set\n' .config
 elif [ "$platform" = "rk3568" ]; then
-    curl -s https://$mirror/openwrt/24-config-musl-r5s > .config
+    curl -s $mirror/openwrt/24-config-musl-r5s > .config
 elif [ "$platform" = "armv8" ]; then
-    curl -s https://$mirror/openwrt/24-config-musl-armsr-armv8 > .config
+    curl -s $mirror/openwrt/24-config-musl-armsr-armv8 > .config
 else
-    curl -s https://$mirror/openwrt/24-config-musl-r4s > .config
+    curl -s $mirror/openwrt/24-config-musl-r4s > .config
 fi
 
 # config-common
 if [ "$MINIMAL_BUILD" = "y" ]; then
-    [ "$platform" != "bcm53xx" ] && curl -s https://$mirror/openwrt/24-config-minimal-common >> .config
+    [ "$platform" != "bcm53xx" ] && curl -s $mirror/openwrt/24-config-minimal-common >> .config
     echo 'VERSION_TYPE="minimal"' >> package/base-files/files/usr/lib/os-release
 else
-    [ "$platform" != "bcm53xx" ] && curl -s https://$mirror/openwrt/24-config-common >> .config
+    [ "$platform" != "bcm53xx" ] && curl -s $mirror/openwrt/24-config-common >> .config
     [ "$platform" = "armv8" ] && sed -i '/DOCKER/Id' .config
 fi
-
-# config-firmware
-[ "$NO_KMOD" != "y" ] && [ "$platform" != "rk3399" ] && curl -s https://$mirror/openwrt/generic/config-firmware >> .config
 
 # ota
 [ "$ENABLE_OTA" = "y" ] && [ "$version" = "rc2" ] && echo 'CONFIG_PACKAGE_luci-app-ota=y' >> .config
 
 # bpf
-[ "$ENABLE_BPF" = "y" ] && curl -s https://$mirror/openwrt/generic/config-bpf >> .config
+[ "$ENABLE_BPF" = "y" ] && curl -s $mirror/openwrt/generic/config-bpf >> .config
 
 # LTO
 export ENABLE_LTO=$ENABLE_LTO
-[ "$ENABLE_LTO" = "y" ] && curl -s https://$mirror/openwrt/generic/config-lto >> .config
+[ "$ENABLE_LTO" = "y" ] && curl -s $mirror/openwrt/generic/config-lto >> .config
 
 # glibc
 [ "$ENABLE_GLIBC" = "y" ] && {
-    curl -s https://$mirror/openwrt/generic/config-glibc >> .config
+    curl -s $mirror/openwrt/generic/config-glibc >> .config
     sed -i '/NaiveProxy/d' .config
 }
 
@@ -337,11 +334,11 @@ fi
 
 # gcc15 patches
 [ "$(whoami)" = "runner" ] && group "patching toolchain"
-curl -s https://$mirror/openwrt/patch/generic-24.10/202-toolchain-gcc-add-support-for-GCC-15.patch | patch -p1
+curl -s $mirror/openwrt/patch/generic-24.10/202-toolchain-gcc-add-support-for-GCC-15.patch | patch -p1
 # gcc config
-[ "$USE_GCC13" = "y" ] && curl -s https://$mirror/openwrt/generic/config-gcc13 >> .config
-[ "$USE_GCC14" = "y" ] && curl -s https://$mirror/openwrt/generic/config-gcc14 >> .config
-[ "$USE_GCC15" = "y" ] && curl -s https://$mirror/openwrt/generic/config-gcc15 >> .config
+[ "$USE_GCC13" = "y" ] && curl -s $mirror/openwrt/generic/config-gcc13 >> .config
+[ "$USE_GCC14" = "y" ] && curl -s $mirror/openwrt/generic/config-gcc14 >> .config
+[ "$USE_GCC15" = "y" ] && curl -s $mirror/openwrt/generic/config-gcc15 >> .config
 [ "$(whoami)" = "runner" ] && endgroup
 
 # uhttpd
@@ -423,9 +420,8 @@ if [ "$platform" = "x86_64" ]; then
     if [ "$NO_KMOD" != "y" ]; then
         cp -a bin/targets/x86/*/packages $kmodpkg_name
         rm -f $kmodpkg_name/Packages*
-        # driver firmware
-        cp -a bin/packages/x86_64/base/*firmware*.ipk $kmodpkg_name/
-        cp -a bin/packages/x86_64/base/*natflow*.ipk $kmodpkg_name/
+        cp -a bin/packages/x86_64/base/rtl88*a-firmware*.ipk $kmodpkg_name/
+        cp -a bin/packages/x86_64/base/natflow*.ipk $kmodpkg_name/
         [ "$ENABLE_DPDK" = "y" ] && {
             cp -a bin/packages/x86_64/base/*dpdk*.ipk $kmodpkg_name/ || true
             cp -a bin/packages/x86_64/base/*numa*.ipk $kmodpkg_name/ || true
@@ -466,9 +462,8 @@ elif [ "$platform" = "armv8" ]; then
     if [ "$NO_KMOD" != "y" ]; then
         cp -a bin/targets/armsr/armv8*/packages $kmodpkg_name
         rm -f $kmodpkg_name/Packages*
-        # driver firmware
-        cp -a bin/packages/aarch64_generic/base/*firmware*.ipk $kmodpkg_name/
-        cp -a bin/packages/aarch64_generic/base/*natflow*.ipk $kmodpkg_name/
+        cp -a bin/packages/aarch64_generic/base/rtl88*a-firmware*.ipk $kmodpkg_name/
+        cp -a bin/packages/aarch64_generic/base/natflow*.ipk $kmodpkg_name/
         [ "$ENABLE_DPDK" = "y" ] && {
             cp -a bin/packages/aarch64_generic/base/*dpdk*.ipk $kmodpkg_name/ || true
             cp -a bin/packages/aarch64_generic/base/*numa*.ipk $kmodpkg_name/ || true
@@ -499,9 +494,8 @@ elif [ "$platform" = "bcm53xx" ]; then
     if [ "$NO_KMOD" != "y" ]; then
         cp -a bin/targets/bcm53xx/generic/packages $kmodpkg_name
         rm -f $kmodpkg_name/Packages*
-        # driver firmware
-        cp -a bin/packages/arm_cortex-a9/base/*firmware*.ipk $kmodpkg_name/
-        cp -a bin/packages/arm_cortex-a9/base/*natflow*.ipk $kmodpkg_name/
+        cp -a bin/packages/arm_cortex-a9/base/rtl88*a-firmware*.ipk $kmodpkg_name/
+        cp -a bin/packages/arm_cortex-a9/base/natflow*.ipk $kmodpkg_name/
         bash kmod-sign $kmodpkg_name
         tar zcf bcm53xx-$kmodpkg_name.tar.gz $kmodpkg_name
         rm -rf $kmodpkg_name
@@ -533,9 +527,8 @@ else
     if [ "$NO_KMOD" != "y" ] && [ "$platform" != "rk3399" ]; then
         cp -a bin/targets/rockchip/armv8*/packages $kmodpkg_name
         rm -f $kmodpkg_name/Packages*
-        # driver firmware
-        cp -a bin/packages/aarch64_generic/base/*firmware*.ipk $kmodpkg_name/
-        cp -a bin/packages/aarch64_generic/base/*natflow*.ipk $kmodpkg_name/
+        cp -a bin/packages/aarch64_generic/base/rtl88*a-firmware*.ipk $kmodpkg_name/
+        cp -a bin/packages/aarch64_generic/base/natflow*.ipk $kmodpkg_name/
         [ "$ENABLE_DPDK" = "y" ] && {
             cp -a bin/packages/aarch64_generic/base/*dpdk*.ipk $kmodpkg_name/ || true
             cp -a bin/packages/aarch64_generic/base/*numa*.ipk $kmodpkg_name/ || true
