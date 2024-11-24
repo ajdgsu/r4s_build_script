@@ -54,7 +54,7 @@ CONFIG_PACKAGE_glib2=y
 CONFIG_PACKAGE_libffi=y
 CONFIG_PACKAGE_virtio-console-helper=y
 CONFIG_PACKAGE_libpcre=y
-CONFIG_PACKAGE_tc-full
+CONFIG_PACKAGE_tc-full=y
 NGINX_HTTP_BROTLI=y
 CONFIG_PACKAGE_qemu-ga=y
 
