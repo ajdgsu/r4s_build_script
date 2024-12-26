@@ -45,7 +45,7 @@ export gitea=git.cooluc.com
 
 # github mirror
 if [ "$isCN" = "CN" ]; then
-    export github="ghp.ci/github.com"
+    export github="ghgo.xyz/github.com"
 else
     export github="github.com"
 fi
@@ -246,6 +246,7 @@ bash 03-convert_translation.sh
 bash 04-fix_kmod.sh
 bash 05-fix-source.sh
 [ -f "10-custom.sh" ] && bash 10-custom.sh
+find feeds -type f -name "*.orig" -exec rm -f {} \;
 [ "$(whoami)" = "runner" ] && endgroup
 
 rm -f 0*-*.sh 10-custom.sh
